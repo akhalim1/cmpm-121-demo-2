@@ -15,3 +15,36 @@ canvas.width = 256;
 canvas.height = 256;
 canvas.id = "sketchpad";
 app.appendChild(canvas);
+
+const clearButton = document.createElement("button");
+clearButton.textContent = "CLEAR";
+app.appendChild(clearButton);
+
+const context = canvas.getContext("2d");
+let drawing: boolean = false;
+
+canvas.addEventListener("mousedown", (event) => {
+  drawing = true;
+  context?.beginPath();
+  context?.moveTo(event.offsetX, event.offsetY);
+});
+
+canvas.addEventListener("mousemove", (event) => {
+  if (!drawing) return;
+
+  context?.lineTo(event.offsetX, event.offsetY);
+  context?.stroke();
+});
+
+canvas.addEventListener("mouseup", () => {
+  drawing = false;
+  context?.closePath();
+});
+
+canvas.addEventListener("mouseout", () => {
+  drawing = false;
+});
+
+clearButton.addEventListener("click", () => {
+  context?.clearRect(0, 0, canvas.width, canvas.height);
+});

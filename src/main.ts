@@ -20,6 +20,14 @@ const clearButton = document.createElement("button");
 clearButton.textContent = "CLEAR";
 app.appendChild(clearButton);
 
+const undoButton = document.createElement("button");
+undoButton.textContent = "UNDO";
+app.appendChild(undoButton);
+
+const redoButton = document.createElement("button");
+redoButton.textContent = "REDO";
+app.appendChild(redoButton);
+
 const context = canvas.getContext("2d");
 let drawing: boolean = false;
 
@@ -30,6 +38,8 @@ type Point = {
 
 let strokes: Point[][] = [];
 let currentStroke: Point[] = [];
+
+let redoStack: Point[][] = [];
 
 canvas.addEventListener("mousedown", (event) => {
   drawing = true;
@@ -58,6 +68,8 @@ canvas.addEventListener("mouseup", () => {
   if (drawing) {
     drawing = false;
     strokes.push(currentStroke);
+    currentStroke = [];
+    redoStack = [];
   }
   //context?.closePath();
 });
@@ -69,11 +81,38 @@ canvas.addEventListener("mouseout", () => {
 clearButton.addEventListener("click", () => {
   strokes = [];
   currentStroke = [];
-
+  redoStack = [];
   context?.clearRect(0, 0, canvas.width, canvas.height);
 });
 
+undoButton.addEventListener("click", () => {
+  if (strokes.length > 0) {
+    const lastStroke = strokes.pop();
+
+    if (lastStroke) {
+      redoStack.push(lastStroke);
+    }
+
+    const drawingChangedEvent = new Event("drawing-changed");
+    canvas.dispatchEvent(drawingChangedEvent);
+  }
+});
+
+redoButton.addEventListener("click", () => {
+  if (redoStack.length > 0) {
+    const redoStroke = redoStack.pop();
+    if (redoStroke) {
+      strokes.push(redoStroke);
+    }
+
+    const drawingChangedEvent = new Event("drawing-changed");
+    canvas.dispatchEvent(drawingChangedEvent);
+  }
+});
+
 canvas.addEventListener("drawing-changed", () => {
+  context?.clearRect(0, 0, canvas.width, canvas.height);
+
   // draw all strokes
   strokes.forEach((stroke) => {
     if (stroke.length > 0) {

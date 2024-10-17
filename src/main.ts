@@ -28,8 +28,38 @@ const redoButton = document.createElement("button");
 redoButton.textContent = "REDO";
 app.appendChild(redoButton);
 
+const thinMarkerButton = document.createElement("button");
+thinMarkerButton.textContent = "THIN";
+thinMarkerButton.id = "thin-tool";
+app.append(thinMarkerButton);
+
+const thickMarkerButton = document.createElement("button");
+thickMarkerButton.textContent = "THICK";
+thickMarkerButton.id = "thick-tool";
+app.append(thickMarkerButton);
+
 const context = canvas.getContext("2d");
 let drawing: boolean = false;
+
+let currentThickness: number = 1;
+
+const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
+  thinMarkerButton.classList.remove("selectedTool");
+  thickMarkerButton.classList.remove("selectedTool");
+  selectedButton.classList.add("selectedTool");
+};
+
+updateSelectedTool(thinMarkerButton);
+
+thinMarkerButton.addEventListener("click", () => {
+  currentThickness = 1;
+  updateSelectedTool(thinMarkerButton);
+});
+
+thickMarkerButton.addEventListener("click", () => {
+  currentThickness = 3;
+  updateSelectedTool(thickMarkerButton);
+});
 
 /*
 type Point = {
@@ -39,9 +69,11 @@ type Point = {
 */
 class MarkerLine {
   points: { x: number; y: number }[];
+  thickness: number;
 
-  constructor(initialPoint: { x: number; y: number }) {
+  constructor(initialPoint: { x: number; y: number }, thickness: number) {
     this.points = [initialPoint];
+    this.thickness = thickness;
   }
 
   drag(x: number, y: number) {
@@ -57,6 +89,7 @@ class MarkerLine {
         ctx.lineTo(this.points[i].x, this.points[i].y);
       }
 
+      ctx.lineWidth = this.thickness;
       ctx.stroke();
       ctx.closePath();
     }
@@ -70,7 +103,10 @@ let redoStack: MarkerLine[] = [];
 canvas.addEventListener("mousedown", (event) => {
   drawing = true;
 
-  currentStroke = new MarkerLine({ x: event.offsetX, y: event.offsetY });
+  currentStroke = new MarkerLine(
+    { x: event.offsetX, y: event.offsetY },
+    currentThickness
+  );
   //context?.beginPath();
   //context?.moveTo(event.offsetX, event.offsetY);
 });

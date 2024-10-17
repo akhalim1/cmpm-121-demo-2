@@ -101,3 +101,8 @@ button:focus-visible {
   margin: 1rem auto;
   display: block;
 }
+
+button.selectedTool {
+  background-color: lightblue;
+  font-weight: bold;
+}

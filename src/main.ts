@@ -17,6 +17,20 @@ canvas.id = "sketchpad";
 canvas.style.cursor = "none";
 app.appendChild(canvas);
 
+const stickers = ["🐸", "🦁", "🦓"];
+
+// buttons
+stickers.forEach((sticker) => {
+  const stickerButton = document.createElement("button");
+  stickerButton.textContent = sticker;
+  app.appendChild(stickerButton);
+
+  stickerButton.addEventListener("click", () => {
+    toolPreviewCommand = new StickerPreviewCommand(sticker, 0, 0);
+    canvas.dispatchEvent(new Event("tool-moved"));
+  });
+});
+
 const clearButton = document.createElement("button");
 clearButton.textContent = "CLEAR";
 app.appendChild(clearButton);
@@ -40,11 +54,17 @@ thickMarkerButton.id = "thick-tool";
 app.append(thickMarkerButton);
 
 const context = canvas.getContext("2d");
-let drawing: boolean = false;
-let toolPreviewCommand: ToolPreviewCommand | null = null;
+let drawing = false;
+let toolPreviewCommand: ToolPreviewCommand | StickerPreviewCommand | null =
+  null;
 
-let currentThickness: number = 1;
-let currentStrokeColor: string = "black";
+let currentStroke: MarkerLine | null = null;
+
+let currentThickness = 1;
+let currentStrokeColor = "black";
+
+let actions: (MarkerLine | StickerCommand)[] = [];
+let redoStack: (MarkerLine | StickerCommand)[] = [];
 
 const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
   thinMarkerButton.classList.remove("selectedTool");
@@ -52,20 +72,23 @@ const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
   selectedButton.classList.add("selectedTool");
 };
 
-updateSelectedTool(thinMarkerButton);
-
 thinMarkerButton.addEventListener("click", () => {
   currentThickness = 1;
   updateSelectedTool(thinMarkerButton);
+  toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
+  canvas.dispatchEvent(new Event("tool-moved"));
 });
 
 thickMarkerButton.addEventListener("click", () => {
   currentThickness = 10;
   updateSelectedTool(thickMarkerButton);
+  toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
+  canvas.dispatchEvent(new Event("tool-moved"));
 });
 
+// Commands
 class MarkerLine {
-  points: { x: number; y: number }[];
+  points: { x: number; y: number }[] = [];
   thickness: number;
   color: string;
 
@@ -74,7 +97,7 @@ class MarkerLine {
     thickness: number,
     color: string
   ) {
-    this.points = [initialPoint];
+    this.points.push(initialPoint);
     this.thickness = thickness;
     this.color = color;
   }
@@ -100,7 +123,12 @@ class MarkerLine {
   }
 }
 
-class ToolPreviewCommand {
+interface PreviewCommand {
+  updatePosition(x: number, y: number): void;
+  draw(ctx: CanvasRenderingContext2D): void;
+}
+
+class ToolPreviewCommand implements PreviewCommand {
   x: number;
   y: number;
   thickness: number;
@@ -118,15 +146,7 @@ class ToolPreviewCommand {
 
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    strokes.forEach((stroke) => {
-      stroke.display(ctx);
-    });
-
-    if (currentStroke) {
-      currentStroke.display(ctx);
-    }
-
+    actions.forEach((action) => action.display(ctx));
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.thickness / 2, 0, Math.PI * 2);
     ctx.strokeStyle = "gray";
@@ -136,78 +156,118 @@ class ToolPreviewCommand {
   }
 }
 
-let strokes: MarkerLine[] = [];
-let currentStroke: MarkerLine | null = null;
-let redoStack: MarkerLine[] = [];
+class StickerPreviewCommand implements PreviewCommand {
+  sticker: string;
+  x: number;
+  y: number;
 
+  constructor(sticker: string, x: number, y: number) {
+    this.sticker = sticker;
+    this.x = x;
+    this.y = y;
+  }
+
+  updatePosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    actions.forEach((action) => action.display(ctx));
+    ctx.font = "32px serif";
+    ctx.fillText(this.sticker, this.x, this.y);
+  }
+}
+
+class StickerCommand {
+  sticker: string;
+  x: number;
+  y: number;
+
+  constructor(sticker: string, x: number, y: number) {
+    this.sticker = sticker;
+    this.x = x;
+    this.y = y;
+  }
+
+  display(ctx: CanvasRenderingContext2D) {
+    ctx.font = "32px serif";
+    ctx.fillText(this.sticker, this.x, this.y);
+  }
+}
+
+// handlers
 canvas.addEventListener("mousedown", (event) => {
-  drawing = true;
-  toolPreviewCommand = null;
+  if (toolPreviewCommand instanceof StickerPreviewCommand) {
+    const stickerCommand = new StickerCommand(
+      toolPreviewCommand.sticker,
+      event.offsetX,
+      event.offsetY
+    );
 
-  currentStroke = new MarkerLine(
-    { x: event.offsetX, y: event.offsetY },
-    currentThickness,
-    currentStrokeColor
-  );
+    actions.push(stickerCommand);
+
+    redoStack = [];
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  } else {
+    drawing = true;
+
+    currentStroke = new MarkerLine(
+      { x: event.offsetX, y: event.offsetY },
+      currentThickness,
+      currentStrokeColor
+    );
+    actions.push(currentStroke);
+  }
 });
 
 canvas.addEventListener("mousemove", (event) => {
+  //console.log(toolPreviewCommand);
   if (!drawing) {
     if (toolPreviewCommand) {
       toolPreviewCommand.updatePosition(event.offsetX, event.offsetY);
-    } else {
-      toolPreviewCommand = new ToolPreviewCommand(
-        event.offsetX,
-        event.offsetY,
-        currentThickness
-      );
     }
 
-    const toolMovedEvent = new Event("tool-moved");
-    canvas.dispatchEvent(toolMovedEvent);
+    canvas.dispatchEvent(new Event("tool-moved"));
   }
 
   if (drawing && currentStroke) {
     currentStroke.drag(event.offsetX, event.offsetY);
-    const drawingChangedEvent = new Event("drawing-changed");
-    canvas.dispatchEvent(drawingChangedEvent);
+    canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
 
 window.addEventListener("mouseup", () => {
   if (drawing && currentStroke) {
     drawing = false;
-    strokes.push(currentStroke);
     currentStroke = null;
     redoStack = [];
   }
 });
 
+// buttons
 clearButton.addEventListener("click", () => {
-  strokes = [];
+  actions = [];
   redoStack = [];
   context?.clearRect(0, 0, canvas.width, canvas.height);
 });
 
 undoButton.addEventListener("click", () => {
-  if (strokes.length > 0) {
-    const lastStroke = strokes.pop();
-    if (lastStroke) {
-      redoStack.push(lastStroke);
-    }
-    const drawingChangedEvent = new Event("drawing-changed");
-    canvas.dispatchEvent(drawingChangedEvent);
+  if (actions.length > 0) {
+    const lastAction = actions.pop();
+    if (lastAction) redoStack.push(lastAction);
+
+    canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
 
 redoButton.addEventListener("click", () => {
   if (redoStack.length > 0) {
-    const redoStroke = redoStack.pop();
-    if (redoStroke) {
-      strokes.push(redoStroke);
-    }
-    const drawingChangedEvent = new Event("drawing-changed");
-    canvas.dispatchEvent(drawingChangedEvent);
+    const redoAction = redoStack.pop();
+    if (redoAction) actions.push(redoAction);
+
+    canvas.dispatchEvent(new Event("drawing-changed"));
   }
 });
 
@@ -220,17 +280,7 @@ canvas.addEventListener("tool-moved", () => {
 canvas.addEventListener("drawing-changed", () => {
   context?.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Redraw all strokes
-  strokes.forEach((stroke) => {
-    stroke.display(context!);
-  });
-
-  // Redraw current stroke
-  if (currentStroke) {
-    currentStroke.display(context!);
-  }
-
-  // draw the tool preview cursor
+  actions.forEach((action) => action.display(context!));
   if (toolPreviewCommand && !drawing) {
     toolPreviewCommand.draw(context!);
   }

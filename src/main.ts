@@ -39,6 +39,9 @@ const renderStickers = () => {
 renderStickers();
 
 // buttons
+const exportButton = document.createElement("button");
+exportButton.textContent = "EXPORT";
+app.appendChild(exportButton);
 
 const customStickerButton = document.createElement("button");
 customStickerButton.textContent = "CREATE CUSTOM STICKER";
@@ -211,6 +214,28 @@ class StickerCommand {
 }
 
 // handlers
+exportButton.addEventListener("click", () => {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+
+  const exportContext = exportCanvas.getContext("2d");
+
+  if (exportContext) {
+    exportContext?.scale(4, 4);
+
+    actions.forEach((action) => action.display(exportContext));
+
+    // download img
+    const anchor = document.createElement("a");
+    anchor.href = exportCanvas.toDataURL("image/png");
+    anchor.download = "sketchpad.png";
+    anchor.click();
+  } else {
+    console.log("Failed to get 2D rendering context");
+  }
+});
+
 customStickerButton.addEventListener("click", () => {
   const newSticker = prompt("Enter custom sticker: ", "🧽");
 

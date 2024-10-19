@@ -17,19 +17,32 @@ canvas.id = "sketchpad";
 canvas.style.cursor = "none";
 app.appendChild(canvas);
 
-const stickers = ["🐸", "🦁", "🦓"];
+let stickers: string[] = ["🐸", "🦁", "🦓"];
+
+const stickerContainer = document.createElement("div");
+app.appendChild(stickerContainer);
+
+const renderStickers = () => {
+  stickerContainer.innerHTML = "";
+  stickers.forEach((sticker) => {
+    const stickerButton = document.createElement("button");
+    stickerButton.textContent = sticker;
+    stickerContainer.appendChild(stickerButton);
+
+    stickerButton.addEventListener("click", () => {
+      toolPreviewCommand = new StickerPreviewCommand(sticker, 0, 0);
+      canvas.dispatchEvent(new Event("tool-moved"));
+    });
+  });
+};
+
+renderStickers();
 
 // buttons
-stickers.forEach((sticker) => {
-  const stickerButton = document.createElement("button");
-  stickerButton.textContent = sticker;
-  app.appendChild(stickerButton);
 
-  stickerButton.addEventListener("click", () => {
-    toolPreviewCommand = new StickerPreviewCommand(sticker, 0, 0);
-    canvas.dispatchEvent(new Event("tool-moved"));
-  });
-});
+const customStickerButton = document.createElement("button");
+customStickerButton.textContent = "CREATE CUSTOM STICKER";
+app.appendChild(customStickerButton);
 
 const clearButton = document.createElement("button");
 clearButton.textContent = "CLEAR";
@@ -198,6 +211,15 @@ class StickerCommand {
 }
 
 // handlers
+customStickerButton.addEventListener("click", () => {
+  const newSticker = prompt("Enter custom sticker: ", "🧽");
+
+  if (newSticker) {
+    stickers.push(newSticker);
+    renderStickers();
+  }
+});
+
 canvas.addEventListener("mousedown", (event) => {
   if (toolPreviewCommand instanceof StickerPreviewCommand) {
     const stickerCommand = new StickerCommand(

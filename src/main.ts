@@ -17,7 +17,12 @@ canvas.id = "sketchpad";
 canvas.style.cursor = "none";
 app.appendChild(canvas);
 
-let stickers: string[] = ["🐸", "🦁", "🦓"];
+let stickers: string[] = ["🐸", "🦁", "🦓", "🐶", "🐱", "😎"];
+
+// constants
+const THIN_MARKER_SIZE = 3;
+const THICK_MARKER_SIZE = 15;
+const EMOJI_SIZE = "64px serif";
 
 const stickerContainer = document.createElement("div");
 app.appendChild(stickerContainer);
@@ -32,6 +37,8 @@ const renderStickers = () => {
     stickerButton.addEventListener("click", () => {
       toolPreviewCommand = new StickerPreviewCommand(sticker, 0, 0);
       canvas.dispatchEvent(new Event("tool-moved"));
+
+      updateSelectedTool(stickerButton);
     });
   });
 };
@@ -76,7 +83,7 @@ let toolPreviewCommand: ToolPreviewCommand | StickerPreviewCommand | null =
 
 let currentStroke: MarkerLine | null = null;
 
-let currentThickness = 1;
+let currentThickness = THIN_MARKER_SIZE;
 let currentStrokeColor = "black";
 
 let actions: (MarkerLine | StickerCommand)[] = [];
@@ -85,18 +92,23 @@ let redoStack: (MarkerLine | StickerCommand)[] = [];
 const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
   thinMarkerButton.classList.remove("selectedTool");
   thickMarkerButton.classList.remove("selectedTool");
+
+  const allStickerButtons = stickerContainer.querySelectorAll("button");
+  allStickerButtons.forEach((button) => {
+    button.classList.remove("selectedTool");
+  });
   selectedButton.classList.add("selectedTool");
 };
 
 thinMarkerButton.addEventListener("click", () => {
-  currentThickness = 1;
+  currentThickness = THIN_MARKER_SIZE;
   updateSelectedTool(thinMarkerButton);
   toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
   canvas.dispatchEvent(new Event("tool-moved"));
 });
 
 thickMarkerButton.addEventListener("click", () => {
-  currentThickness = 10;
+  currentThickness = THICK_MARKER_SIZE;
   updateSelectedTool(thickMarkerButton);
   toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
   canvas.dispatchEvent(new Event("tool-moved"));
@@ -191,7 +203,7 @@ class StickerPreviewCommand implements PreviewCommand {
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     actions.forEach((action) => action.display(ctx));
-    ctx.font = "32px serif";
+    ctx.font = EMOJI_SIZE;
     ctx.fillText(this.sticker, this.x, this.y);
   }
 }
@@ -208,7 +220,7 @@ class StickerCommand {
   }
 
   display(ctx: CanvasRenderingContext2D) {
-    ctx.font = "32px serif";
+    ctx.font = EMOJI_SIZE;
     ctx.fillText(this.sticker, this.x, this.y);
   }
 }

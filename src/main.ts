@@ -24,6 +24,25 @@ const THIN_MARKER_SIZE = 3;
 const THICK_MARKER_SIZE = 15;
 const EMOJI_SIZE = "64px serif";
 
+const randomColor = () => {
+  const randomHex = Math.floor(Math.random() * 16777215).toString(16);
+  return `#${randomHex}`;
+};
+const randomizeMarkerSettings = () => {
+  currentStrokeColor = randomColor();
+};
+
+let currentRotation: number = 0;
+
+const randomRotation = () => {
+  return Math.random() * 360;
+};
+
+const colorPicker = document.createElement("input");
+colorPicker.type = "color";
+colorPicker.value = "#000000";
+app.appendChild(colorPicker);
+
 const stickerContainer = document.createElement("div");
 app.appendChild(stickerContainer);
 
@@ -35,7 +54,15 @@ const renderStickers = () => {
     stickerContainer.appendChild(stickerButton);
 
     stickerButton.addEventListener("click", () => {
-      toolPreviewCommand = new StickerPreviewCommand(sticker, 0, 0);
+      currentRotation = randomRotation();
+      currentStrokeColor = randomColor();
+
+      toolPreviewCommand = new StickerPreviewCommand(
+        sticker,
+        0,
+        0,
+        currentRotation
+      );
       canvas.dispatchEvent(new Event("tool-moved"));
 
       updateSelectedTool(stickerButton);
@@ -83,8 +110,8 @@ let toolPreviewCommand: ToolPreviewCommand | StickerPreviewCommand | null =
 
 let currentStroke: MarkerLine | null = null;
 
-let currentThickness = THIN_MARKER_SIZE;
-let currentStrokeColor = "black";
+let currentThickness: number = THIN_MARKER_SIZE;
+let currentStrokeColor: string = "black";
 
 let actions: (MarkerLine | StickerCommand)[] = [];
 let redoStack: (MarkerLine | StickerCommand)[] = [];
@@ -101,6 +128,7 @@ const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
 };
 
 thinMarkerButton.addEventListener("click", () => {
+  randomizeMarkerSettings();
   currentThickness = THIN_MARKER_SIZE;
   updateSelectedTool(thinMarkerButton);
   toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
@@ -108,6 +136,7 @@ thinMarkerButton.addEventListener("click", () => {
 });
 
 thickMarkerButton.addEventListener("click", () => {
+  randomizeMarkerSettings();
   currentThickness = THICK_MARKER_SIZE;
   updateSelectedTool(thickMarkerButton);
   toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
@@ -188,11 +217,13 @@ class StickerPreviewCommand implements PreviewCommand {
   sticker: string;
   x: number;
   y: number;
+  rotation: number;
 
-  constructor(sticker: string, x: number, y: number) {
+  constructor(sticker: string, x: number, y: number, rotation: number) {
     this.sticker = sticker;
     this.x = x;
     this.y = y;
+    this.rotation = rotation;
   }
 
   updatePosition(x: number, y: number) {
@@ -203,8 +234,14 @@ class StickerPreviewCommand implements PreviewCommand {
   draw(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     actions.forEach((action) => action.display(ctx));
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate((this.rotation * Math.PI) / 180);
+
     ctx.font = EMOJI_SIZE;
-    ctx.fillText(this.sticker, this.x, this.y);
+    ctx.fillText(this.sticker, 0, 0);
+    ctx.restore();
   }
 }
 
@@ -212,20 +249,30 @@ class StickerCommand {
   sticker: string;
   x: number;
   y: number;
+  rotation: number;
 
-  constructor(sticker: string, x: number, y: number) {
+  constructor(sticker: string, x: number, y: number, rotation: number) {
     this.sticker = sticker;
     this.x = x;
     this.y = y;
+    this.rotation = rotation;
   }
 
   display(ctx: CanvasRenderingContext2D) {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate((this.rotation * Math.PI) / 180);
     ctx.font = EMOJI_SIZE;
-    ctx.fillText(this.sticker, this.x, this.y);
+    ctx.fillText(this.sticker, 0, 0);
+    ctx.restore();
   }
 }
 
 // handlers
+colorPicker.addEventListener("input", (event) => {
+  currentStrokeColor = (event.target as HTMLInputElement).value;
+});
+
 exportButton.addEventListener("click", () => {
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = 1024;
@@ -262,7 +309,8 @@ canvas.addEventListener("mousedown", (event) => {
     const stickerCommand = new StickerCommand(
       toolPreviewCommand.sticker,
       event.offsetX,
-      event.offsetY
+      event.offsetY,
+      toolPreviewCommand.rotation
     );
 
     actions.push(stickerCommand);

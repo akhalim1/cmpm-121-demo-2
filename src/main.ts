@@ -1,10 +1,10 @@
 import "./style.css";
 
+// Defining Title and Canvas
 const APP_NAME = "My Sticker Sketchpad";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
-//app.innerHTML = APP_NAME;
 
 const titleElement = document.createElement("h1");
 titleElement.textContent = APP_NAME;
@@ -17,13 +17,22 @@ canvas.id = "sketchpad";
 canvas.style.cursor = "none";
 app.appendChild(canvas);
 
-let stickers: string[] = ["🐸", "🦁", "🦓", "🐶", "🐱", "😎"];
-
-// constants
+// Variables
 const THIN_MARKER_SIZE = 3;
 const THICK_MARKER_SIZE = 15;
 const EMOJI_SIZE = "64px serif";
 
+let currentStroke: MarkerLine | null = null;
+
+let currentThickness: number = THIN_MARKER_SIZE;
+let currentStrokeColor: string = "black";
+
+let actions: (MarkerLine | StickerCommand)[] = [];
+let redoStack: (MarkerLine | StickerCommand)[] = [];
+
+const stickers: string[] = ["🐸", "🦁", "🦓", "🐶", "🐱", "😎"];
+
+// Color, Sticker, and Rotation Generation
 const randomColor = () => {
   const randomHex = Math.floor(Math.random() * 16777215).toString(16);
   return `#${randomHex}`;
@@ -72,49 +81,27 @@ const renderStickers = () => {
 
 renderStickers();
 
-// buttons
-const exportButton = document.createElement("button");
-exportButton.textContent = "EXPORT";
-app.appendChild(exportButton);
+// Buttons - Refactored to use createButton function
+const exportButton = createButton("EXPORT", "");
+const customStickerButton = createButton("CREATE CUSTOM SITCKER", "");
+const clearButton = createButton("CLEAR", "");
+const undoButton = createButton("UNDO", "");
+const redoButton = createButton("REDO", "");
+const thinMarkerButton = createButton("THIN", "thin-tool");
+const thickMarkerButton = createButton("THICK", "thick-tool");
 
-const customStickerButton = document.createElement("button");
-customStickerButton.textContent = "CREATE CUSTOM STICKER";
-app.appendChild(customStickerButton);
-
-const clearButton = document.createElement("button");
-clearButton.textContent = "CLEAR";
-app.appendChild(clearButton);
-
-const undoButton = document.createElement("button");
-undoButton.textContent = "UNDO";
-app.appendChild(undoButton);
-
-const redoButton = document.createElement("button");
-redoButton.textContent = "REDO";
-app.appendChild(redoButton);
-
-const thinMarkerButton = document.createElement("button");
-thinMarkerButton.textContent = "THIN";
-thinMarkerButton.id = "thin-tool";
-app.append(thinMarkerButton);
-
-const thickMarkerButton = document.createElement("button");
-thickMarkerButton.textContent = "THICK";
-thickMarkerButton.id = "thick-tool";
-app.append(thickMarkerButton);
+function createButton(buttonText: string, buttonID: string): HTMLButtonElement {
+  const newButton = document.createElement("button");
+  newButton.textContent = buttonText;
+  newButton.id = buttonID;
+  app.append(newButton);
+  return newButton;
+}
 
 const context = canvas.getContext("2d");
 let drawing = false;
 let toolPreviewCommand: ToolPreviewCommand | StickerPreviewCommand | null =
   null;
-
-let currentStroke: MarkerLine | null = null;
-
-let currentThickness: number = THIN_MARKER_SIZE;
-let currentStrokeColor: string = "black";
-
-let actions: (MarkerLine | StickerCommand)[] = [];
-let redoStack: (MarkerLine | StickerCommand)[] = [];
 
 const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
   thinMarkerButton.classList.remove("selectedTool");
@@ -127,6 +114,7 @@ const updateSelectedTool = (selectedButton: HTMLButtonElement) => {
   selectedButton.classList.add("selectedTool");
 };
 
+// Adding Button and Canvas Functionality
 thinMarkerButton.addEventListener("click", () => {
   randomizeMarkerSettings();
   currentThickness = THIN_MARKER_SIZE;
@@ -141,6 +129,45 @@ thickMarkerButton.addEventListener("click", () => {
   updateSelectedTool(thickMarkerButton);
   toolPreviewCommand = new ToolPreviewCommand(0, 0, currentThickness);
   canvas.dispatchEvent(new Event("tool-moved"));
+});
+
+clearButton.addEventListener("click", () => {
+  actions = [];
+  redoStack = [];
+  context?.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+undoButton.addEventListener("click", () => {
+  if (actions.length > 0) {
+    const lastAction = actions.pop();
+    if (lastAction) redoStack.push(lastAction);
+
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  }
+});
+
+redoButton.addEventListener("click", () => {
+  if (redoStack.length > 0) {
+    const redoAction = redoStack.pop();
+    if (redoAction) actions.push(redoAction);
+
+    canvas.dispatchEvent(new Event("drawing-changed"));
+  }
+});
+
+canvas.addEventListener("tool-moved", () => {
+  if (!drawing && toolPreviewCommand) {
+    toolPreviewCommand.draw(context!);
+  }
+});
+
+canvas.addEventListener("drawing-changed", () => {
+  context?.clearRect(0, 0, canvas.width, canvas.height);
+
+  actions.forEach((action) => action.display(context!));
+  if (toolPreviewCommand && !drawing) {
+    toolPreviewCommand.draw(context!);
+  }
 });
 
 // Commands
@@ -268,7 +295,7 @@ class StickerCommand {
   }
 }
 
-// handlers
+// Event Handlers
 colorPicker.addEventListener("input", (event) => {
   currentStrokeColor = (event.target as HTMLInputElement).value;
 });
@@ -285,13 +312,12 @@ exportButton.addEventListener("click", () => {
 
     actions.forEach((action) => action.display(exportContext));
 
-    // download img
     const anchor = document.createElement("a");
     anchor.href = exportCanvas.toDataURL("image/png");
     anchor.download = "sketchpad.png";
     anchor.click();
   } else {
-    console.log("Failed to get 2D rendering context");
+    console.error("Failed to get 2D rendering context");
   }
 });
 
@@ -330,7 +356,6 @@ canvas.addEventListener("mousedown", (event) => {
 });
 
 canvas.addEventListener("mousemove", (event) => {
-  //console.log(toolPreviewCommand);
   if (!drawing) {
     if (toolPreviewCommand) {
       toolPreviewCommand.updatePosition(event.offsetX, event.offsetY);
@@ -345,50 +370,10 @@ canvas.addEventListener("mousemove", (event) => {
   }
 });
 
-window.addEventListener("mouseup", () => {
+globalThis.addEventListener("mouseup", () => {
   if (drawing && currentStroke) {
     drawing = false;
     currentStroke = null;
     redoStack = [];
-  }
-});
-
-// buttons
-clearButton.addEventListener("click", () => {
-  actions = [];
-  redoStack = [];
-  context?.clearRect(0, 0, canvas.width, canvas.height);
-});
-
-undoButton.addEventListener("click", () => {
-  if (actions.length > 0) {
-    const lastAction = actions.pop();
-    if (lastAction) redoStack.push(lastAction);
-
-    canvas.dispatchEvent(new Event("drawing-changed"));
-  }
-});
-
-redoButton.addEventListener("click", () => {
-  if (redoStack.length > 0) {
-    const redoAction = redoStack.pop();
-    if (redoAction) actions.push(redoAction);
-
-    canvas.dispatchEvent(new Event("drawing-changed"));
-  }
-});
-
-canvas.addEventListener("tool-moved", () => {
-  if (!drawing && toolPreviewCommand) {
-    toolPreviewCommand.draw(context!);
-  }
-});
-
-canvas.addEventListener("drawing-changed", () => {
-  context?.clearRect(0, 0, canvas.width, canvas.height);
-
-  actions.forEach((action) => action.display(context!));
-  if (toolPreviewCommand && !drawing) {
-    toolPreviewCommand.draw(context!);
   }
 });

@@ -47,10 +47,18 @@ const randomRotation = () => {
   return Math.random() * 360;
 };
 
+const colorPickerContainer = document.createElement("div");
+colorPickerContainer.classList.add("color-picker-container");
+app.appendChild(colorPickerContainer);
+
+const colorPickerLabel = document.createElement("span");
+colorPickerLabel.textContent = "Choose Color: ";
+colorPickerContainer.appendChild(colorPickerLabel);
+
 const colorPicker = document.createElement("input");
 colorPicker.type = "color";
 colorPicker.value = "#000000";
-app.appendChild(colorPicker);
+colorPickerContainer.appendChild(colorPicker);
 
 const stickerContainer = document.createElement("div");
 app.appendChild(stickerContainer);

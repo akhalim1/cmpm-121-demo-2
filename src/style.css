@@ -69,9 +69,10 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #393f47;
   cursor: pointer;
   transition: border-color 0.25s;
+  margin: 0.16rem;
 }
 button:hover {
   border-color: #646cff;
@@ -103,6 +104,28 @@ button:focus-visible {
 }
 
 button.selectedTool {
-  background-color: lightgreen;
+  background-color: rgb(134, 185, 134);
   font-weight: bold;
+}
+
+.color-picker-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.color-picker-container span {
+  margin-right: 10px; 
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.color-picker-container input[type="color"] {
+  border: none;
+  padding: 1px;
+  cursor: pointer;
+  height: 25px;
+  width: 55px;
+  border-radius: 2px;
 }
